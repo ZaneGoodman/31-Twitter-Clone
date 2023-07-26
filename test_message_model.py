@@ -52,16 +52,16 @@ class MessageModelTestCase(TestCase):
             username="testuser2",
             password="HASHED_PASSWORD2"
         )
-        invalid_user = User(username="testuser3", password="HASHED_PASSWORD3")
-        
+        invalid_message = Message(user_id=1)
+        message1 = Message(text="Hello World")
 
         
 
         self.client = app.test_client()
         self.user1 = user1
         self.user2 = user2
-        self.invalid_user = invalid_user
-        message1 = Message(text="Hello World", user_id=self.user1.id)
+        self.invalid_message = invalid_message
+        
         self.message1 = message1
     
 
@@ -81,61 +81,40 @@ class MessageModelTestCase(TestCase):
         self.assertEqual(len(self.user1.messages), 0)
         self.assertEqual(self.message1.text, "Hello World")
 
-    def test_message_model_user_relationship(self):
+    def test_message_model_user_relationship_successful(self):
         """Does Message.user return the user who created the message?"""
+        self.user1.messages.append(self.message1)
+        db.session.add(self.user1)
+        db.session.commit()
+        self.assertEqual(self.message1.user, self.user1)
+
+    def test_message_model_user_relationship_unsuccessful(self):
+        """Does Message.user return the user who created the message?"""
+        self.user1.messages.append(self.message1)
+        db.session.add(self.user1)
+        db.session.commit()
+        self.assertNotEqual(self.message1.user, self.user2)
+
+    def test_message_model_user_id_set_none(self):
+        """Is Message.user_id set to None when the user is deleted?"""
+        self.user1.messages.append(self.message1)
+        db.session.add(self.user1)
+        db.session.commit()
+        db.session.delete(self.user1)
+        db.session.commit()
         
-        self.assertEqual(self.message1.user_id, self.user1.id)
+        self.assertEqual(self.message1.user_id, None)
 
-    # def test_user_model_is_following_method(self):
-    #     """Does is_following successfully detect when user1 is following user2?"""
-    #     self.user1.following.append(self.user2)
-    #     db.session.commit()
+    def test_successful_create_new_message(self):
+        """Does Message.create successfully create a new message given valid credentials?"""
+        new_message = Message(text="Goodbye Everyone")
+        db.session.add(new_message)
+        db.session.commit()
+        self.assertEqual(Message.query.get(new_message.id), new_message)
 
-    #     self.assertEqual(self.user1.is_following(self.user2), True)
+    def test_unsuccessful_create_new_user(self):
+        """Does Message.create throw IntegrityError when given invalid credentials?"""
+        db.session.add(self.invalid_message)
+        self.assertRaises(IntegrityError, db.session.commit)
 
-    # def test_user_model_is_following_method_2(self):
-    #     """Does is_following successfully detect when user1 is not following user2?"""
-
-    #     self.assertEqual(self.user1.is_following(self.user2), False)
-
-    # def test_user_model_is_followed_by_method(self):
-    #     """Does is_followed_by successfully detect when user1 is followed by user2?"""
-    #     self.user1.followers.append(self.user2)
-    #     self.assertEqual(self.user1.is_followed_by(self.user2), True)
-
-    # def test_user_model_is_followed_by_method_2(self):
-    #     """Does is_followed_by successfully detect when user1 is not followed by user2?"""
-
-    #     self.assertEqual(self.user1.is_followed_by(self.user2), False)
-
-    # def test_successful_create_new_user(self):
-    #     """Does User.create successfully create a new user given valid credentials?"""
-    #     new_user = User(email="test3@test.com", username="testuser3", password="HASHED_PASSWORD3")
-    #     db.session.add(new_user)
-    #     db.session.commit()
-    #     self.assertEqual(User.query.get(new_user.id), new_user)
-
-    # def test_unsuccessful_create_new_user(self):
-    #     """Does User.create fail to create a new user if any of the validations (e.g. uniqueness, non-nullable fields) fail?"""
-    #     db.session.add(self.invalid_user)
-    #     self.assertRaises(IntegrityError, db.session.commit)
-
-    # def test_user_authenticate_successful(self):
-    #     """Does User.authenticate successfully return a user when given a valid username and password?"""
-    #     user = User.signup('bob', 'bob123@aol.com', "bob123", "/static/images/default-pic.png")
-    #     db.session.commit()
-    #     self.assertEqual(user.authenticate("bob", "bob123"), user)
-
-    # def test_user_authenticate_invalid_username(self):
-    #     """Does User.authenticate successfully return False when the given username is invalid?"""
-    #     user = User.signup('bob', 'bob123@aol.com', "bob123", "/static/images/default-pic.png")
-    #     db.session.add(user)
-    #     db.session.commit()
-    #     self.assertEqual(user.authenticate("bob1", "bob123"), False)
-
-    # def test_user_authenticate_invalid_password(self):
-    #     """Does User.authenticate successfully return False when the given password is invalid?"""
-    #     user = User.signup('bob', 'bob123@aol.com', "bob123", "/static/images/default-pic.png")
-    #     db.session.add(user)
-    #     db.session.commit()
-    #     self.assertEqual(user.authenticate("bob", "bob234"), False)
+    
