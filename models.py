@@ -147,6 +147,7 @@ class User(db.Model):
         )
 
         db.session.add(user)
+     
         return user
 
     @classmethod
@@ -193,8 +194,8 @@ class Message(db.Model):
 
     user_id = db.Column(
         db.Integer,
-        db.ForeignKey('users.id', ondelete='CASCADE'),
-        nullable=False,
+        db.ForeignKey('users.id', ondelete='SET NULL'),
+        nullable=True,
     )
 
     user = db.relationship('User')

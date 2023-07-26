@@ -5,7 +5,7 @@ from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 
 from forms import UserAddForm, LoginForm, MessageForm, UserProfileEditForm
-from models import db, connect_db, User, Message
+from models import db, connect_db, User, Message, Likes, Follows
 
 CURR_USER_KEY = "curr_user"
 
@@ -82,6 +82,9 @@ def signup():
             flash("Username already taken", 'danger')
             return render_template('users/signup.html', form=form)
 
+        follow_self = Follows(user_being_followed_id=user.id, user_following_id=user.id)
+        db.session.add(follow_self)
+        db.session.commit()
         do_login(user)
 
         return redirect("/")
@@ -209,6 +212,15 @@ def stop_following(follow_id):
 
     return redirect(f"/users/{g.user.id}/following")
 
+@app.route('/users/<int:user_id>/likes')
+def user_likes(user_id):
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+    user = User.query.get_or_404(user_id)
+    user_liked_messages = Message.query.filter(Message.id == Likes.message_id).all()
+    return render_template('users/liked_warbles.html', user=user, user_liked_messages=user_liked_messages)
+    
 
 @app.route('/users/profile', methods=["GET", "POST"])
 def profile():
@@ -233,6 +245,21 @@ def profile():
             return redirect('/')
     return render_template('users/edit.html', form=form)
     # IMPLEMENT THIS
+
+@app.route('/users/add_like/<int:msg_id>', methods=["POST"])
+def add_like(msg_id):
+    msg = Message.query.get(msg_id)
+    all_liked_messages = Message.query.filter(Message.id == Likes.message_id).all()
+    if msg not in all_liked_messages:
+        new_like = Likes(user_id=g.user.id, message_id=msg_id)
+        db.session.add(new_like)
+        db.session.commit()
+        
+    else:
+        liked_msg = Likes.query.filter(Likes.message_id == msg_id).first()
+        db.session.delete(liked_msg)
+        db.session.commit()
+    return redirect('/')
 
 
 @app.route('/users/delete', methods=["POST"])
@@ -311,21 +338,18 @@ def homepage():
     - anon users: no messages
     - logged in: 100 most recent messages of followed_users
     """
-    users_following = g.user.following
-    for user in users_following:
-        for msg in user.messages:
-            return [msg + g.user.messages]
-    # will return message from users being followed. 
-
 
     if g.user:
-        messages = (Message
+        all_liked_messages = Message.query.filter(Message.id == Likes.message_id).all()
+        user_msgs = g.user.messages
+        following_messages = (Message
                     .query
+                    .filter(Message.user_id == Follows.user_being_followed_id, Follows.user_following_id == g.user.id)
                     .order_by(Message.timestamp.desc())
                     .limit(100)
                     .all())
-
-        return render_template('home.html', messages=messages)
+        messages = user_msgs + following_messages
+        return render_template('home.html', messages=messages, liked_msgs=all_liked_messages)
 
     else:
         return render_template('home-anon.html')
