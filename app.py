@@ -82,9 +82,9 @@ def signup():
             flash("Username already taken", 'danger')
             return render_template('users/signup.html', form=form)
 
-        follow_self = Follows(user_being_followed_id=user.id, user_following_id=user.id)
-        db.session.add(follow_self)
-        db.session.commit()
+        # follow_self = Follows(user_being_followed_id=user.id, user_following_id=user.id)
+        # db.session.add(follow_self)
+        # db.session.commit()
         do_login(user)
 
         return redirect("/")

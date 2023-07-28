@@ -70,11 +70,6 @@ class UserViewTestCase(TestCase):
         self.user5_id = 50
         self.user5.id = self.user5_id
 
-        self.test_msg = Message(id=11, text="Hello", user_id=self.user5_id)
-        self.test_msg2 = Message(id=12, text="Goodbye", user_id=self.user5_id)
-        self.like = Likes(user_id=self.user5_id, message_id=self.test_msg)
-        self.like = Likes(user_id=self.user5_id, message_id=self.test_msg2)
-       
         db.session.commit()
        
 
@@ -88,6 +83,16 @@ class UserViewTestCase(TestCase):
         follow4 = Follows(user_being_followed_id=self.testuser_id,user_following_id=self.user5_id)
 
         db.session.add_all([follow1, follow2, follow3, follow4])
+        db.session.commit()
+
+    def setup_likes(self):
+        test_msg = Message(id=11, text="Hello", user_id=self.user4_id)
+        test_msg2 = Message(id=15, text="Goodbye", user_id=self.user4_id)
+        db.session.add_all([test_msg, test_msg2])
+        db.session.commit()
+
+        like = Likes(user_id=self.user5_id, message_id=test_msg.id)
+        db.session.add(like)
         db.session.commit()
 
 
@@ -145,11 +150,7 @@ class UserViewTestCase(TestCase):
 
     def test_add_like(self):
         """Can a logged in user add a like?"""
-       
-        test_msg = Message(id=15, text="Hello", user_id=self.testuser_id)
-
-        db.session.add(test_msg)
-        db.session.commit()
+        self.setup_likes()
 
         with self.client as c:
             with c.session_transaction() as sess:
@@ -163,23 +164,21 @@ class UserViewTestCase(TestCase):
 
     def test_remove_like(self):
         """Can a logged in user remove a like?"""
-        test_msg = Message(id=11, text="Hello", user_id=self.user5_id)
-        db.session.add(test_msg)
-        db.session.commit()
-
-        like = Likes(user_id=self.user5_id, message_id=test_msg)
-        
-        db.session.add(like)
-        db.session.commit()
-
-        check_like = Likes.query.filter(Likes.user_id==self.user5_id and Likes.message_id==test_msg).one()
-        self.assertEqual(len(self.user5.likes), 1)
+        self.setup_likes()
 
         with self.client as c:
             with c.session_transaction() as sess:
                 sess[CURR_USER_KEY] = self.user5_id
+        # confirm this user has liked the message
+        like = Likes.query.filter(Likes.user_id==self.user5_id and Likes.message_id==11).one()
+        self.assertEqual(like.user_id, self.user5_id)
+        self.assertEqual(len(User.query.get(sess[CURR_USER_KEY]).likes), 1)
+        
+        resp = c.post(f'/users/add_like/11', follow_redirects=True)
 
-        resp = c.post(f'/users/add_like/{self.test_msg.id}', follow_redirects=True)
+        # confirm that the like has now been removed
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(User.query.get(sess[CURR_USER_KEY]).likes), 0)
    
 
 
